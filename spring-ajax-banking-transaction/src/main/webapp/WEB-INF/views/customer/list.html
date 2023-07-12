@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>List of customers</title>
+    <link rel="stylesheet" href="/assets/bootstrap/v5.3.0/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/assets/fontawesome/v5.15.4/css/all.min.css">
+    <link rel="stylesheet" href="/assets/sweetalert2/v11.7.12/sweetalert2.min.css">
+    <link rel="stylesheet" href="/assets/css/style.css">
+    <script src="/assets/bootstrap/v5.3.0/js/bootstrap.bundle.min.js"></script>
+</head>
+<body>
+<div class="container">
+    <header>
+        <div class="col-lg-6">
+            <h1>List of customer </h1>
+        </div>
+        <div class="col-lg-6 header-right-button">
+            <a href="">
+                <button class="btn btn-outline-light">
+                    <i class="fas fa-history"></i>
+                    Transfer histories
+                </button>
+            </a>
+            <button class="btn btn-outline-light" id="btnShowCreateModal">
+                <i class="fas fa-user-plus"></i>
+                Add new customer
+            </button>
+        </div>
+    </header>
+
+    <div class="content">
+        <table class="table table-hover">
+            <thead>
+            <tr class="text-center">
+                <th>ID</th>
+                <th>FullName</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Address</th>
+                <th>Balance</th>
+                <th>Action</th>
+            </tr>
+            </thead>
+            <tbody id="tbCustomer">
+
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<th:block th:replace="customer/modalCreate"/>
+<th:block th:replace="customer/modalUpdate"/>
+<th:block th:replace="customer/modalDeposit"/>
+<th:block th:replace="customer/modalTransfer"/>
+<th:block th:replace="customer/modalWithdraw"/>
+
+<script src="/assets/js/jquery-3.6.0.min.js"></script>
+<script src="/assets/js/jquery.validate.min.js"></script>
+<script src="additional-methods.min.js"></script>
+<script src="/assets/js/app.js"></script>
+<script src="/assets/sweetalert2/v11.7.12/sweetalert2.all.min.js"></script>
+<script src="/assets/js/jquery.number.js"></script>
+
+<script>
+    const page = {
+        url: {
+            getAllCustomers: App.API_CUSTOMER,
+            createCustomer: App.API_CUSTOMER,
+            getCustomerById: App.API_CUSTOMER,
+            updateCustomer: App.API_CUSTOMER,
+            updateBalance: App.API_CUSTOMER,
+            deposit: App.API_DEPOSIT,
+            withdraw: App.API_WITHDRAW,
+            transfer: App.API_TRANSFER,
+            getRecipients: App.API_CUSTOMER,
+            deleteCustomer: App.API_CUSTOMER
+        },
+        elements: {},
+        loadData: {},
+        commands: {},
+        dialogs: {
+            elements: {},
+            commands: {}
+        },
+        initializeControlEvent: {}
+    }
+
+
+    page.elements.tbCustomerBody = $('#tbCustomer');
+
+    page.elements.btnShowCreateModal = $('#btnShowCreateModal');
+
+
+    page.dialogs.elements.modalCreate = $('#modalCreate');
+    page.dialogs.elements.frmCreate = $('#frmCreate');
+    page.dialogs.elements.fullNameCre = $('#fullNameCre');
+    page.dialogs.elements.emailCre = $('#emailCre');
+    page.dialogs.elements.phoneCre = $('#phoneCre');
+    page.dialogs.elements.addressCre = $('#addressCre');
+    page.dialogs.elements.btnCreate = $('#btnCreate');
+    page.dialogs.elements.errorAreaCreate=$('#modalCreate .error-area')
+
+
+    page.dialogs.elements.modalUpdate = $('#modalUpdate');
+    page.dialogs.elements.frmUpdate = $('#frmUpdate');
+    page.dialogs.elements.fullNameUp = $('#fullNameUp');
+    page.dialogs.elements.emailUp = $('#emailUp');
+    page.dialogs.elements.phoneUp = $('#phoneUp');
+    page.dialogs.elements.addressUp = $('#addressUp');
+    page.dialogs.elements.btnUpdate = $('#btnUpdate');
+    page.dialogs.elements.frmUpdate=$('#frmUpdate');
+    page.dialogs.elements.errorAreaUpdate=$('#modalUpdate .error-area')
+
+
+
+    page.dialogs.elements.modalDeposit = $('#modalDeposit');
+    page.dialogs.elements.errorAreaDeposit = $('#modalDeposit .error-area');
+    page.dialogs.elements.frmDeposit = $('#frmDeposit');
+    page.dialogs.elements.fullNameDep = $('#fullNameDep');
+    page.dialogs.elements.emailDep = $('#emailDep');
+    page.dialogs.elements.balanceDep = $('#balanceDep');
+    page.dialogs.elements.transactionAmountDep = $('#transactionAmountDep');
+    page.dialogs.elements.btnDeposit = $('#btnDeposit');
+
+
+    page.dialogs.elements.modalWithdraw = $('#modalWithdraw');
+    page.dialogs.elements.errorAreaWithdraw = $('#modalWithdraw .error-area');
+    page.dialogs.elements.frmWithdraw = $('#frmWithdraw');
+    page.dialogs.elements.fullNameWit = $('#fullNameWit');
+    page.dialogs.elements.emailWit = $('#emailWit');
+    page.dialogs.elements.balanceWit = $('#balanceWit');
+    page.dialogs.elements.transactionAmountWit = $('#transactionAmountWit');
+    page.dialogs.elements.btnWithdraw = $('#btnWithdraw');
+
+
+    page.dialogs.elements.modalTransfer = $('#modalTransfer');
+    page.dialogs.elements.errorAreaTransfer = $('#modalTransfer .error-area');
+    page.dialogs.elements.frmTransfer = $('#frmTransfer');
+    page.dialogs.elements.fullNameTra = $('#fullNameTra');
+    page.dialogs.elements.idTra = $('#idTra');
+    page.dialogs.elements.emailTra = $('#emailTra');
+    page.dialogs.elements.addressTra = $('#addressTra');
+    page.dialogs.elements.phoneTra = $('#phoneTra');
+    page.dialogs.elements.balanceTra = $('#balanceTra');
+    page.dialogs.elements.transferAmountTra = $('#transferAmountTra');
+    page.dialogs.elements.transactionAmountTra = $('#transactionAmountTra');
+    page.dialogs.elements.feesTra = $('#feesTra');
+    page.dialogs.elements.btnTransfer = $('#btnTransfer');
+
+
+    let customerId = 0;
+    let customer = null;
+    let deposit = new Deposit();
+
+    page.commands.renderCustomer = (obj) => {
+        return `
+            <tr id="tr_${obj.id}">
+                <td>${obj.id} </td>
+                <td>${obj.fullName} </td>
+                <td>${obj.email} </td>
+                <td>${obj.phone} </td>
+                <td>${obj.address} </td>
+                <td class="text-end num-space">${obj.balance}</td>
+                <td class="text-end">
+                    <button  class="btn btn-outline-secondary edit" data-id="${obj.id}" >
+                            <i class="far fa-edit"></i>
+                    </button>
+                    <button  class="btn btn-outline-success deposit" data-id="${obj.id}">
+                                <i class="fas fa-plus"></i>
+                    </button>
+                    <button  class="btn btn-outline-warning withdraw" data-id="${obj.id}">
+                            <i class="fa fa-minus"></i>
+                    </button>
+                    <button  class="btn btn-outline-primary transfer" data-id="${obj.id}">
+                            <i class="fas fa-exchange-alt" ></i>
+                    </button>
+                    <button  class="btn btn-outline-danger delete" data-id="${obj.id}">
+                            <i class="fas fa-ban" ></i>
+                    </button>
+                </td>
+            </tr>`;
+    }
+
+
+    page.commands.getAllCustomers = () => {
+
+        page.elements.tbCustomerBody.empty();
+
+        $.ajax({
+            type: 'GET',
+            url: page.url.getAllCustomers
+        })
+            .done((data) => {
+                data.forEach(item => {
+                    const str = page.commands.renderCustomer(item);
+                    page.elements.tbCustomerBody.prepend(str);
+                });
+            })
+            .fail((error) => {
+                console.log(error);
+            })
+    }
+
+
+    page.commands.getCustomerById = (id) => {
+        return $.ajax({
+            type: 'GET',
+            url: page.url.getCustomerById + '/' + id,
+        });
+    }
+
+
+    page.dialogs.commands.create = () => {
+        const fullName = page.dialogs.elements.fullNameCre.val();
+        const email = page.dialogs.elements.emailCre.val();
+        const phone = page.dialogs.elements.phoneCre.val();
+        const address = page.dialogs.elements.addressCre.val();
+        const balance = 0;
+        const deleted = 0;
+
+        const obj = {
+            fullName,
+            email,
+            phone,
+            address,
+            balance,
+            deleted
+        }
+
+        $.ajax({
+            headers: {
+                'accept': 'application/json',
+                'content-type': 'application/json'
+            },
+            type: 'POST',
+            url: page.url.createCustomer,
+            data: JSON.stringify(obj)
+        })
+            .done((data) => {
+                const str = page.commands.renderCustomer(data);
+                page.elements.tbCustomerBody.prepend(str);
+
+                page.dialogs.elements.modalCreate.modal('hide');
+                Swal.fire({
+                    position: 'center',
+                    icon: 'success',
+                    title: 'Tạo mới thành công',
+                    showConfirmButton: false,
+                    timer: 1500
+                })
+            })
+            .fail((error) => {
+                console.log(error);
+            })
+    }
+
+
+    page.commands.handleAddEventShowModalUpdate = (customerId) => {
+        page.commands.getCustomerById(customerId).then((data) => {
+            customer = data;
+            page.dialogs.elements.fullNameUp.val(customer.fullName);
+            page.dialogs.elements.emailUp.val(customer.email);
+            page.dialogs.elements.phoneUp.val(customer.phone);
+            page.dialogs.elements.addressUp.val(customer.address);
+
+            page.dialogs.elements.modalUpdate.modal('show');
+        })
+            .catch((error) => {
+                console.log(error);
+            });
+    }
+
+
+    page.dialogs.commands.update = () => {
+        const fullName = page.dialogs.elements.fullNameUp.val();
+        const email = page.dialogs.elements.emailUp.val();
+        const phone = page.dialogs.elements.phoneUp.val();
+        const address = page.dialogs.elements.addressUp.val();
+
+        customer.fullName = fullName;
+        customer.email = email;
+        customer.phone = phone;
+        customer.address = address;
+        $.ajax({
+            headers: {
+                'accept': 'application/json',
+                'content-type': 'application/json'
+            },
+            type: 'PATCH',
+            url: page.url.updateCustomer + '/' + customerId,
+            data: JSON.stringify(customer)
+        })
+            .done((data) => {
+                const str = page.commands.renderCustomer(data);
+
+                const currentRow = $('#tr_' + customerId);
+                currentRow.replaceWith(str);
+
+                page.dialogs.elements.modalUpdate.modal('hide');
+
+                Swal.fire({
+                    position: 'center',
+                    icon: 'success',
+                    title: 'Đã cập nhật thông tin',
+                    showConfirmButton: false,
+                    timer: 1500
+                })
+            })
+            .fail((error) => {
+                console.log(error);
+            })
+    }
+
+
+    page.commands.handleAddEventShowModalDeposit = (customerId) => {
+        page.commands.getCustomerById(customerId).then((data) => {
+            customer = data;
+            page.dialogs.elements.fullNameDep.val(customer.fullName);
+            page.dialogs.elements.emailDep.val(customer.email);
+            page.dialogs.elements.balanceDep.val(customer.balance);
+
+            page.dialogs.elements.modalDeposit.modal('show');
+        })
+            .catch((error) => {
+                console.log(error);
+            });
+    }
+
+
+    page.dialogs.commands.deposit = () => {
+        const transactionAmount = +$('#transactionAmountDep').val();
+
+        const obj = {
+            customerId,
+            transactionAmount
+        }
+
+        $.ajax({
+            headers: {
+                'accept': 'application/json',
+                'content-type': 'application/json'
+            },
+            type: 'POST',
+            url: page.url.deposit + '/' + customerId,
+            data: JSON.stringify(obj)
+        })
+            .done((data) => {
+
+                const str = page.commands.renderCustomer(data);
+
+                const currentRow = $('#tr_' + customerId);
+                currentRow.replaceWith(str);
+
+                page.dialogs.elements.modalDeposit.modal('hide');
+
+                Swal.fire({
+                    position: 'center',
+                    icon: 'success',
+                    title: 'Nạp tiền thành công',
+                    showConfirmButton: false,
+                    timer: 1000
+                })
+            })
+            .fail((jqXHR) => {
+                const responseJSON = jqXHR.responseJSON;
+
+                page.dialogs.elements.errorAreaDeposit.empty();
+                let str = '';
+
+                $.each(responseJSON, (k, v) => {
+                    str += `<label for="${k}Dep">${v}</label>`
+                })
+
+                page.dialogs.elements.errorAreaDeposit.append(str).removeClass('hide').addClass('show');
+
+                console.log(jqXHR);
+            })
+    }
+
+
+    page.commands.handleAddEventShowModalTransfer = (customerId) => {
+        page.commands.getCustomerById(customerId).then((data) => {
+            customer = data;
+            page.dialogs.elements.idTra.val(customer.id);
+            page.dialogs.elements.fullNameTra.val(customer.fullName);
+            page.dialogs.elements.emailTra.val(customer.email);
+            page.dialogs.elements.addressTra.val(customer.address);
+            page.dialogs.elements.phoneTra.val(customer.phone);
+            page.dialogs.elements.balanceTra.val(customer.balance);
+
+            const customerSelect = $("#idRecipient");
+            customerSelect.empty();
+
+            $.getJSON(page.url.getAllCustomers, function (data) {
+                let customers = data;
+
+                customers.forEach((customer) => {
+                    if (customer.id !== customerId) {
+                        const option = $("<option></option>").val(customer.id).text(`(${customer.id}) ${customer.fullName}`);
+                        customerSelect.append(option);
+                    }
+                });
+            });
+
+            page.dialogs.elements.transferAmountTra.val(0);
+            page.dialogs.elements.feesTra.val(10);
+            page.dialogs.elements.transactionAmountTra.val(0);
+            page.dialogs.elements.modalTransfer.modal('show');
+        })
+            .catch((error) => {
+                console.log(error);
+            });
+    }
+
+
+    page.dialogs.commands.transfer = () => {
+        const transferAmount = +$('#transferAmountTra').val();
+        const customerId = page.dialogs.elements.idTra.val();
+        const idRecipient = $('#idRecipient').val();
+
+        const obj = {
+            customerId,
+            idRecipient,
+            transferAmount,
+        }
+
+        $.ajax({
+            headers: {
+                'accept': 'application/json',
+                'content-type': 'application/json'
+            },
+            type: 'POST',
+            url: page.url.transfer + '/' + customerId,
+            data: JSON.stringify(obj)
+        })
+            .done((data) => {
+                for (let i = 0; i < data.length; i++) {
+                    let str = page.commands.renderCustomer(data[i]);
+                    let currentRow = $('#tr_' + data[i].id);
+                    currentRow.replaceWith(str);
+                }
+
+                page.dialogs.elements.modalTransfer.modal('hide');
+
+                Swal.fire({
+                    position: 'center',
+                    icon: 'success',
+                    title: 'Chuyển tiền thành công',
+                    showConfirmButton: false,
+                    timer: 1000
+                })
+            })
+            .fail((jqXHR) => {
+                const responseJSON = jqXHR.responseJSON;
+
+                page.dialogs.elements.errorAreaTransfer.empty();
+                let str = '';
+
+                $.each(responseJSON, (k, v) => {
+                    str += `<label for="${k}Tra">${v}</label>`
+                })
+
+                page.dialogs.elements.errorAreaTransfer.append(str).removeClass('hide').addClass('show');
+
+                console.log(jqXHR);
+            })
+    }
+
+
+    page.commands.handleAddEventShowModalWithdraw = (customerId) => {
+        page.commands.getCustomerById(customerId).then((data) => {
+            customer = data;
+            page.dialogs.elements.fullNameWit.val(customer.fullName);
+            page.dialogs.elements.emailWit.val(customer.email);
+            page.dialogs.elements.balanceWit.val(customer.balance);
+
+            page.dialogs.elements.modalWithdraw.modal('show');
+        })
+            .catch((error) => {
+                console.log(error);
+            });
+    }
+
+
+    page.dialogs.commands.withdraw = () => {
+        const transactionAmount = +$('#transactionAmountWit').val();
+
+        const obj = {
+            customerId,
+            transactionAmount
+        }
+
+        $.ajax({
+            headers: {
+                'accept': 'application/json',
+                'content-type': 'application/json'
+            },
+            type: 'POST',
+            url: page.url.withdraw + '/' + customerId,
+            data: JSON.stringify(obj)
+        })
+            .done((data) => {
+
+                const str = page.commands.renderCustomer(data);
+
+                const currentRow = $('#tr_' + customerId);
+                currentRow.replaceWith(str);
+
+                page.dialogs.elements.modalWithdraw.modal('hide');
+
+                Swal.fire({
+                    position: 'center',
+                    icon: 'success',
+                    title: 'Rút tiền thành công',
+                    showConfirmButton: false,
+                    timer: 1000
+                })
+            })
+            .fail((jqXHR) => {
+                const responseJSON = jqXHR.responseJSON;
+
+                page.dialogs.elements.errorAreaWithdraw.empty();
+                let str = '';
+
+                $.each(responseJSON, (k, v) => {
+                    str += `<label for="${k}Wit">${v}</label>`
+                })
+
+                page.dialogs.elements.errorAreaWithdraw.append(str).removeClass('hide').addClass('show');
+
+                console.log(jqXHR);
+            })
+    }
+
+
+    page.commands.handleAddEventShowModalDelete = (customerId) => {
+        $.ajax({
+            headers: {
+                'accept': 'application/json',
+                'content-type': 'application/json'
+            },
+            type: 'DELETE',
+            url: page.url.getAllCustomers + '/' + customerId
+        })
+            .done(() => {
+
+                $(`#tr_${customerId}`).remove();
+
+                Swal.fire({
+                    position: 'center',
+                    icon: 'success',
+                    title: 'Xóa thành công',
+                    showConfirmButton: false,
+                    timer: 1000
+                })
+            })
+            .fail((error) => {
+                console.log(error);
+            });
+    }
+
+
+    page.initializeControlEvent = () => {
+
+        page.elements.btnShowCreateModal.on('click', () => {
+            page.dialogs.elements.modalCreate.modal('show');
+        })
+
+        page.dialogs.elements.btnCreate.on('click', () => {
+            page.dialogs.elements.frmCreate.trigger("submit");
+        })
+
+        page.dialogs.commands.closeModalCreate = () => {
+            page.dialogs.elements.frmCreate[0].reset();
+        }
+
+        page.dialogs.elements.modalCreate.on("hidden.bs.modal", function () {
+            page.dialogs.commands.closeModalCreate();
+        });
+
+
+        page.elements.tbCustomerBody.on('click', '.edit', function () {
+            customerId = $(this).data('id');
+            page.commands.handleAddEventShowModalUpdate(customerId);
+        })
+
+
+        page.dialogs.elements.btnUpdate.on('click', () => {
+            page.dialogs.elements.frmUpdate.trigger("submit");
+        })
+
+        page.elements.tbCustomerBody.on('click', '.deposit', function () {
+            customerId = $(this).data('id');
+            page.commands.handleAddEventShowModalDeposit(customerId);
+        })
+
+        page.dialogs.elements.btnDeposit.on('click', () => {
+            page.dialogs.elements.frmDeposit.trigger("submit");
+        })
+
+        page.elements.tbCustomerBody.on('click', '.transfer', function () {
+            customerId = $(this).data('id');
+            page.commands.handleAddEventShowModalTransfer(customerId);
+        })
+
+        page.dialogs.elements.btnTransfer.on('click', () => {
+            page.dialogs.elements.frmTransfer.trigger("submit");
+        })
+
+        page.elements.tbCustomerBody.on('click', '.withdraw', function () {
+            customerId = $(this).data('id');
+            page.commands.handleAddEventShowModalWithdraw(customerId);
+        })
+
+        page.dialogs.elements.btnWithdraw.on('click', () => {
+            page.dialogs.elements.frmWithdraw.trigger("submit");
+        })
+
+        page.elements.tbCustomerBody.on('click', '.delete', function () {
+            customerId = $(this).data('id');
+            page.commands.handleAddEventShowModalDelete(customerId);
+        })
+
+    }
+
+
+    page.dialogs.elements.frmDeposit.validate({
+        rules: {
+            transactionAmountDep: {
+                required: true
+            }
+        },
+        messages: {
+            transactionAmountDep: {
+                required: 'Số tiền muốn nạp là bắt buộc'
+            }
+        },
+        errorLabelContainer: "#modalDeposit .error-area",
+        errorPlacement: function (error, element) {
+            error.appendTo("#modalDeposit .error-area");
+        },
+        showErrors: function (errorMap, errorList) {
+            if (this.numberOfInvalids() > 0) {
+                page.dialogs.elements.errorAreaDeposit.removeClass("hide").addClass("show");
+            } else {
+                page.dialogs.elements.errorAreaDeposit.removeClass("show").addClass("hide").empty();
+                $("#frmDeposit input.error").removeClass("error");
+            }
+            this.defaultShowErrors();
+        },
+        submitHandler: function () {
+            page.dialogs.commands.deposit();
+        }
+    })
+
+
+    page.dialogs.elements.frmCreate.validate({
+        rules: {
+            fullNameCre: {
+                required: true,
+                maxlength:20,
+                minLength:5
+            },
+            phoneCre: {
+                required: true,
+                maxlength: 20
+            },
+            emailCre: {
+                required: true,
+                maxlength:30,
+                email:true
+            }
+        },
+        messages: {
+            fullNameCre: {
+                required: 'Tên nhập là bắt buộc',
+                maxlength: 'Tên tối đa 20 ký tự',
+                minLength: 'Tên tối thiểu 5 ký tự'
+            },
+            emailCre: {
+                required: 'Email là bắt buộc',
+                maxlength:'Email tối đa 30 ký tự'
+            },
+            phoneCre: {
+                required: 'Phone là bắt buộc'
+            }
+        },
+        errorLabelContainer: "#modalCreate .error-area",
+        errorPlacement: function (error, element) {
+            error.appendTo("#modalCreate .error-area");
+        },
+        showErrors: function (errorMap, errorList) {
+            if (this.numberOfInvalids() > 0) {
+                page.dialogs.elements.errorAreaCreate.removeClass("hide").addClass("show");
+            } else {
+                page.dialogs.elements.errorAreaCreate.removeClass("show").addClass("hide").empty();
+                $("#frmCreate input.error").removeClass("error");
+            }
+            this.defaultShowErrors();
+        },
+        submitHandler: function () {
+            page.dialogs.commands.create();
+        }
+    })
+
+
+    page.dialogs.elements.frmUpdate.validate({
+        rules: {
+            fullNameUp: {
+                required: true,
+                maxlength:20,
+                minLength:5
+            },
+            emailUp: {
+                required: true,
+                maxlength:30,
+                email:true
+            }
+        },
+        messages: {
+            fullNameUp: {
+                required: 'Tên nhập là bắt buộc',
+                maxlength: 'Tên tối đa 20 ký tự',
+                minLength: 'Tên tối thiểu 5 ký tự'
+            },
+            emailUp: {
+                required: 'Email là bắt buộc',
+                maxlength:'Email tối đa 30 ký tự'
+            },
+        },
+        errorLabelContainer: "#modalUpdate .error-area",
+        errorPlacement: function (error, element) {
+            error.appendTo("#modalUpdate .error-area");
+        },
+        showErrors: function (errorMap, errorList) {
+            if (this.numberOfInvalids() > 0) {
+                page.dialogs.elements.errorAreaUpdate.removeClass("hide").addClass("show");
+            } else {
+                page.dialogs.elements.errorAreaUpdate.removeClass("show").addClass("hide").empty();
+                $("#frmUpdate input.error").removeClass("error");
+            }
+            this.defaultShowErrors();
+        },
+        submitHandler: function () {
+            page.dialogs.commands.update();
+        }
+    })
+
+
+    page.dialogs.elements.frmWithdraw.validate({
+        rules: {
+            transactionAmountWit: {
+                required: true
+            }
+        },
+        messages: {
+            transactionAmountWit: {
+                required: 'Số tiền muốn rút là bắt buộc'
+            }
+        },
+        errorLabelContainer: "#modalWithdraw .error-area",
+        errorPlacement: function (error, element) {
+            error.appendTo("#modalWithdraw .error-area");
+        },
+        showErrors: function (errorMap, errorList) {
+            if (this.numberOfInvalids() > 0) {
+                page.dialogs.elements.errorAreaWithdraw.removeClass("hide").addClass("show");
+            } else {
+                page.dialogs.elements.errorAreaWithdraw.removeClass("show").addClass("hide").empty();
+                $("#frmWithdraw input.error").removeClass("error");
+            }
+            this.defaultShowErrors();
+        },
+        submitHandler: function () {
+            page.dialogs.commands.withdraw();
+        }
+    })
+
+
+    page.dialogs.elements.frmTransfer.validate({
+        rules: {
+            transferAmountTra: {
+                required: true
+            }
+        },
+        messages: {
+            transferAmountTra: {
+                required: 'Số tiền muốn chuyển là bắt buộc'
+            }
+        },
+        errorLabelContainer: "#modalTransfer .error-area",
+        errorPlacement: function (error, element) {
+            error.appendTo("#modalTransfer .error-area");
+        },
+        showErrors: function (errorMap, errorList) {
+            if (this.numberOfInvalids() > 0) {
+                page.dialogs.elements.errorAreaTransfer.removeClass("hide").addClass("show");
+            } else {
+                page.dialogs.elements.errorAreaTransfer.removeClass("show").addClass("hide").empty();
+                $("#frmTransfer input.error").removeClass("error");
+            }
+            this.defaultShowErrors();
+        },
+        submitHandler: function () {
+            page.dialogs.commands.transfer();
+        }
+    })
+
+
+    page.loadData = () => {
+        page.commands.getAllCustomers()
+    }
+    $(() => {
+        page.loadData();
+
+        page.initializeControlEvent();
+
+    })
+
+    function calculateTotal() {
+        const transferAmount = parseFloat(
+            document.getElementById("transferAmountTra").value
+        );
+        if (!isNaN(transferAmount)) {
+            const transactionAmount = transferAmount + (transferAmount * 10) / 100;
+            document.getElementById("transactionAmountTra").value = transactionAmount;
+        }
+    }
+    calculateTotal();
+
+</script>
+</body>
+</html>
